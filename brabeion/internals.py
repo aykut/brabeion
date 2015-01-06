@@ -26,8 +26,12 @@ class BadgeCache(object):
             self._event_registry.setdefault(event, []).append(badge)
     
     def possibly_award_badge(self, event, **state):
+        badge_bag = []
         for badge in self._event_registry[event]:
-            badge.possibly_award(**state)
+            badge_awarded = badge.possibly_award(**state)
+            if badge_awarded:
+                badge_bag.append(badge_awarded)
+        return badge_bag
 
 
 badges = BadgeCache()

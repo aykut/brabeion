@@ -10,9 +10,10 @@ class BadgeAwarded(object):
 
 
 class BadgeDetail(object):
-    def __init__(self, name=None, description=None):
+    def __init__(self, name=None, description=None, logo=None):
         self.name = name
         self.description = description
+        self.logo = logo
 
 
 class Badge(object):
@@ -63,6 +64,7 @@ class Badge(object):
         badge = BadgeAward.objects.create(user=user, slug=self.slug,
             level=awarded, **extra_kwargs)
         badge_awarded.send(sender=self, badge_award=badge)
+        return badge
     
     def freeze(self, **state):
         return state
