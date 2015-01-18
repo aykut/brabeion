@@ -3,19 +3,18 @@ from django.contrib.auth.models import User
 from brabeion.base import Badge
 
 
-
 class BadgeCache(object):
     """
     This is responsible for storing all badges that have been registered, as
     well as providing the pulic API for awarding badges.
-    
+
     This class should not be instantiated multiple times, if you do it's your
     fault when things break, and you get to pick up all the pieces.
     """
     def __init__(self):
         self._event_registry = {}
         self._registry = {}
-    
+
     def register(self, badge):
         # We should probably duck-type this, but for now it's a decent sanity
         # check.
@@ -24,7 +23,7 @@ class BadgeCache(object):
         self._registry[badge.slug] = badge
         for event in badge.events:
             self._event_registry.setdefault(event, []).append(badge)
-    
+
     def possibly_award_badge(self, event, **state):
         badge_bag = []
         for badge in self._event_registry[event]:
@@ -32,6 +31,10 @@ class BadgeCache(object):
             if badge_awarded:
                 badge_bag.append(badge_awarded)
         return badge_bag
+
+    def possibly_takeback_badge(self, event, **state):
+        for badge in self._event_registry[event]:
+            badge.possibly_takeback(**state)
 
 
 badges = BadgeCache()

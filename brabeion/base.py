@@ -1,6 +1,6 @@
 from brabeion.models import BadgeAward
-from brabeion.signals import badge_awarded
-
+from brabeion.signals import (
+    badge_awarded, pre_badge_takenback, post_badge_takenback)
 
 
 class BadgeAwarded(object):
@@ -18,13 +18,13 @@ class BadgeDetail(object):
 
 class Badge(object):
     async = False
-    
+
     def __init__(self):
         assert not (self.multiple and len(self.levels) > 1)
         for i, level in enumerate(self.levels):
             if not isinstance(level, BadgeDetail):
                 self.levels[i] = BadgeDetail(level)
-    
+
     def possibly_award(self, **state):
         """
         Will see if the user should be awarded a badge.  If this badge is
@@ -37,7 +37,7 @@ class Badge(object):
             AsyncBadgeAward.delay(self, state)
             return
         self.actually_possibly_award(**state)
-    
+
     def actually_possibly_award(self, **state):
         """
         Does the actual work of possibly awarding a badge.
@@ -56,16 +56,33 @@ class Badge(object):
         awarded = awarded.level - 1
         assert awarded < len(self.levels)
         if (not self.multiple and
-            BadgeAward.objects.filter(user=user, slug=self.slug, level=awarded)):
+            BadgeAward.objects.filter(user=user, slug=self.slug,
+                                      level=awarded)):
             return
         extra_kwargs = {}
         if force_timestamp is not None:
             extra_kwargs["awarded_at"] = force_timestamp
         badge = BadgeAward.objects.create(user=user, slug=self.slug,
-            level=awarded, **extra_kwargs)
+                                          level=awarded, **extra_kwargs)
         badge_awarded.send(sender=self, badge_award=badge)
         return badge
-    
+
+    def possibly_takeback(self, **state):
+        assert 'user' in state
+        assert self.multiple is not True  # not available for now
+
+        user = state["user"]
+        takenback_badges = self.takeback(**state)
+        if not takenback_badges:
+            return
+
+        for level in takenback_badges:
+            badge = BadgeAward.objects.get(
+                user=user, slug=self.slug, level=level - 1)
+            pre_badge_takenback.send(sender=self, badge_takenback=badge)
+            badge.delete()
+            post_badge_takenback.send(sender=self, badge_takenback=badge)
+
     def freeze(self, **state):
         return state
 
