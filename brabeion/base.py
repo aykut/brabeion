@@ -18,12 +18,27 @@ class BadgeDetail(object):
 
 class Badge(object):
     async = False
+    award_priors = True
 
     def __init__(self):
         assert not (self.multiple and len(self.levels) > 1)
         for i, level in enumerate(self.levels):
             if not isinstance(level, BadgeDetail):
                 self.levels[i] = BadgeDetail(level)
+
+    def possibly_award_priors(self, user, level, **extra_kwargs):
+        priors = range(0, level)
+        if not priors:
+            return
+
+        existing_badges = BadgeAward.objects.filter(
+            user=user, slug=self.slug, level__in=priors).values_list(
+            'level', flat=True)
+        priors = set(priors) - set(existing_badges)
+        for prior in priors:
+            badge = BadgeAward.objects.create(user=user, slug=self.slug,
+                                              level=prior, **extra_kwargs)
+            badge_awarded.send(sender=self, badge_award=badge)
 
     def possibly_award(self, **state):
         """
@@ -65,7 +80,24 @@ class Badge(object):
         badge = BadgeAward.objects.create(user=user, slug=self.slug,
                                           level=awarded, **extra_kwargs)
         badge_awarded.send(sender=self, badge_award=badge)
+        if self.award_priors:
+            self.possibly_award_priors(user, awarded, **extra_kwargs)
         return badge
+
+    def takeback(self, **state):
+        level, user = 0, state['user']
+        awarded = self.award(**state)
+        if awarded:
+            level, user = awarded.level, awarded.user
+
+        latest_badge = user.badges_earned.filter(
+            slug=self.slug).order_by('-level').first()
+        if not latest_badge:
+            return
+        latest_level = latest_badge.level + 1
+        if latest_level <= level:
+            return []
+        return range(level + 1, latest_level + 1)
 
     def possibly_takeback(self, **state):
         assert 'user' in state
