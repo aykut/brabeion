@@ -18,7 +18,7 @@ class BadgeDetail(object):
 
 class Badge(object):
     async = False
-    award_priors = True
+    award_priors = False
 
     def __init__(self):
         assert not (self.multiple and len(self.levels) > 1)
