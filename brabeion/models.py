@@ -17,6 +17,10 @@ class BadgeAward(models.Model):
     def __getattr__(self, attr):
         return getattr(self._badge, attr)
 
+    class Meta:
+        # WARNING: you can't use this with multiple badges.
+        unique_together = (('user', 'slug', 'level'),)
+
     @property
     def badge(self):
         return self
